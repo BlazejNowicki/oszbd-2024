@@ -62,26 +62,28 @@ Oprogramowanie dostępne jest na przygotowanej maszynie wirtualnej
 Wykonaj i porównaj wyniki następujących poleceń.
 
 ```sql
-select _avg_(unitprice) avgprice
+select avg(unitprice) avgprice
 from products p;
 
-select _avg_(unitprice) over () as avgprice
+select avg(unitprice) over () as avgprice
 from products p;
 
-select categoryid, _avg_(unitprice) avgprice
+select categoryid, avg(unitprice) avgprice
 from products p
 group by categoryid
 
-select _avg_(unitprice) over (partition by categoryid) as avgprice
+select avg(unitprice) over (partition by categoryid) as avgprice
 from products p;
 ```
 
 Jaka jest są podobieństwa, jakie różnice pomiędzy grupowaniem danych a działaniem funkcji okna?
 
 ```
--- wyniki ...
+1. Średnia dla wszystkich produktów.
+2. Zapytanie używa funkcji okna, zwraca tę samą wartość liczbową co zapytanie nr 1, ale dodaje te wartość dla każdego produktu.
+3. Zapytanie grupujące, oblicza średnią wartość dla każdej z grup, rozróżnianych przed categoryid.
+4. Zapytanie używa funkcji okna. Od zapytania nr 2 odróżnia je to, że tym razem średnią liczymy na grupach produktów które łączy to samo categoryid (definiowane przez instrukcje partitionby). Wartości są zwracane dla każðego produktu podobnie jak w zapytaniu nr 2.
 ```
-
 ---
 # Zadanie 2 - obserwacja
 
@@ -91,21 +93,41 @@ Wykonaj i porównaj wyniki następujących poleceń.
 --1)
 
 select p.productid, p.ProductName, p.unitprice,
-       (select _avg_(unitprice) from products) as avgprice
+       (select avg(unitprice) from products) as avgprice
 from products p
 where productid < 10
 
 --2)
 select p.productid, p.ProductName, p.unitprice,
-       _avg_(unitprice) over () as avgprice
+       avg(unitprice) over () as avgprice
 from products p
 where productid < 10
 ```
 
 
-Jaka jest różnica? Czego dotyczy warunek w każdym z przypadków? Napisz polecenie równoważne 
-- 1) z wykorzystaniem funkcji okna. Napisz polecenie równoważne 
-- 1) z wykorzystaniem podzapytania
+Jaka jest różnica? Czego dotyczy warunek w każdym z przypadków?  
+1) Napisz polecenie równoważne z wykorzystaniem funkcji okna. 
+2) Napisz polecenie równoważne z wykorzystaniem podzapytania
+
+```
+Zapytanie nr 1 liczy średnią z cen wszystkich produktów. Zapytanie nr 2 liczy średnią tylko z cen produktów wybranych przez to zapytanie (czyli spełniających warunek z klauzuli WHERE).
+```
+```sql
+-- Zapytanie nr 1 napisane przy pomocy funkcji okna:
+-- w postgress i sqlite limit 10
+select top 10 p.productid, p.ProductName, p.unitprice, 
+    avg(unitprice) over () as avgprice 
+from products p
+order by productid
+
+-- Zapytanie nr 2 napisane przy użyciu podzapytania:
+
+select p.productid, p.ProductName, p.unitprice,
+       (select avg(unitprice) from products where productid < 10) as avgprice
+from products p
+where productid < 10
+
+```
 
 # Zadanie 3
 

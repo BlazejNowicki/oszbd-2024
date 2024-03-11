@@ -196,7 +196,34 @@ Napisz polecenie z wykorzystaniem podzapytania, join'a oraz funkcji okna. Porów
 Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 ```sql
--- wyniki ...
+-- SQLites
+-- subquery
+SELECT p.ProductID,
+       p.ProductName,
+       p.UnitPrice,
+       (SELECT AVG(pp.UnitPrice) FROM products pp WHERE pp.CategoryID == p.CategoryID) AS avgprice
+FROM products p
+    WHERE p.UnitPrice > avgprice
+
+--join
+SELECT p.ProductID,
+       p.ProductName,
+       p.UnitPrice,
+       AVG(pp.unitprice) AS avgprice
+FROM products p
+        LEFT JOIN products pp ON pp.CategoryID = p.CategoryID
+GROUP BY p.productid, p.ProductName, p.unitprice
+HAVING p.UnitPrice > avgprice
+
+--window function
+SELECT *
+FROM (SELECT p.ProductID,
+             p.ProductName,
+             p.UnitPrice,
+             AVG(p.UnitPrice) OVER (PARTITION BY p.CategoryID)
+                 AS avgprice
+      FROM products p) t
+WHERE t.UnitPrice > t.avgprice
 ```
 
 

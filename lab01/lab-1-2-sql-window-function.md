@@ -152,7 +152,35 @@ W DataGrip użyj opcji Explain Plan/Explain Analyze
 
 
 ```sql
--- wyniki ...
+-- subquery
+SELECT p.productid,
+       p.ProductName,
+       p.unitprice,
+       (SELECT AVG(unitprice) FROM products) AS avgprice
+FROM products p
+
+-- window function
+SELECT p.productid,
+       p.ProductName,
+       p.unitprice,
+       AVG(unitprice) OVER () AS avgprice
+FROM products p
+
+-- join
+SELECT p.productid,
+       p.ProductName,
+       p.unitprice,
+       AVG(pp.unitprice) AS avgprice
+FROM products p
+         CROSS JOIN products pp
+GROUP BY p.productid, p.ProductName, p.unitprice
+
+```
+
+TODO zdjęcia
+
+```
+Funkcja okna ma najmniejszy koszt. ZNajduje sie w niej jeden full index scan, którego koszt jest najwyższy.
 ```
 
 ---

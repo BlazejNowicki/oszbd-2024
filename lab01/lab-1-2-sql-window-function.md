@@ -5,7 +5,9 @@
 
 ---
 **Imię i nazwisko:**
-
+Wojciech Jasiński
+Błażej Nowicki
+Przemysław Węglik
 --- 
 
 
@@ -176,11 +178,15 @@ FROM products p
 GROUP BY p.productid, p.ProductName, p.unitprice
 
 ```
-
-TODO zdjęcia
+Subquery:
+![w:700](_img/zad3_subquery.jpg)
+Join:
+![w:700](_img/zad3_join.jpg)
+Funkcja okna:
+![w:700](_img/zad3_window.jpg)
 
 ```
-Funkcja okna ma najmniejszy koszt. ZNajduje sie w niej jeden full index scan, którego koszt jest najwyższy.
+Funkcja okna ma najmniejszy koszt. Znajduje sie w niej jeden full index scan, którego koszt jest najwyższy.
 ```
 
 ---

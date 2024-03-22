@@ -484,23 +484,23 @@ group by p.id, p.productid, p.productname, p.unitprice
 
 Funkcja okna - 4s
 
-![w:700](/_img/zad7_okno.png)
+![w:700](_img/zad7_okno.png)
 
 Przeprowadza tylko jeden index scan. Szybka i prosty plan wykonania
 
 Podzapytania - 4s
 
-![w:700](/_img/zad7_podzapytanie.png)
+![w:700](_img/zad7_podzapytanie.png)
 
 Skomplikowany plan wykonania ale szybka. Przeprowadza wiele skanów bazy ale kazdy mocno ograniczony
 
 Join - DNF
 
-![w:700](/_img/zad7_join.png)
+![w:700](_img/zad7_join.png)
 
 Liczba operacji rzędu długości tabeli ^3. Próba 15 minutowa na pełnej tabeli. Widac za to ze sql server zrównolegla zapytania i dobrze wykorzystuje zasoby.
 
-![w:700](/_img/zad7_cpu.png)
+![w:700](_img/zad7_cpu.png)
 
 Plan operacji udało sie wykonać tylko po dodatkowych klauzlach where < n na id w tabelach
 
@@ -542,7 +542,7 @@ select productid, productname, unitprice, categoryid,
 from products;
 ```
 
-![w:700](/_img/zad8_porownanie.png)
+![w:700](_img/zad8_porownanie.png)
 
 Podzapytania róznią się dla takich samych wartości w kolumnie. 
 

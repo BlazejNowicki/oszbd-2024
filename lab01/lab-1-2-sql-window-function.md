@@ -484,23 +484,23 @@ group by p.id, p.productid, p.productname, p.unitprice
 
 Funkcja okna - 4s
 
-![w:700](/_img/zad7_okno.png)
+![w:700](_img/zad7_okno.png)
 
 Przeprowadza tylko jeden index scan. Szybka i prosty plan wykonania
 
 Podzapytania - 4s
 
-![w:700](/_img/zad7_podzapytanie.png)
+![w:700](_img/zad7_podzapytanie.png)
 
 Skomplikowany plan wykonania ale szybka. Przeprowadza wiele skanów bazy ale kazdy mocno ograniczony
 
 Join - DNF
 
-![w:700](/_img/zad7_join.png)
+![w:700](_img/zad7_join.png)
 
 Liczba operacji rzędu długości tabeli ^3. Próba 15 minutowa na pełnej tabeli. Widac za to ze sql server zrównolegla zapytania i dobrze wykorzystuje zasoby.
 
-![w:700](/_img/zad7_cpu.png)
+![w:700](_img/zad7_cpu.png)
 
 Plan operacji udało sie wykonać tylko po dodatkowych klauzlach where < n na id w tabelach
 
@@ -542,7 +542,7 @@ select productid, productname, unitprice, categoryid,
 from products;
 ```
 
-![w:700](/_img/zad8_porownanie.png)
+![w:700](_img/zad8_porownanie.png)
 
 Podzapytania róznią się dla takich samych wartości w kolumnie. 
 
@@ -601,16 +601,72 @@ Dla każdego produktu, podaj 4 najwyższe ceny tego produktu w danym roku. Zbió
 Uporządkuj wynik wg roku, nr produktu, pozycji w rankingu
 
 ```sql
---- wyniki ...
+WITH ranked_prices AS (
+    SELECT 
+        EXTRACT(YEAR FROM ChangeDate) AS Year,
+        ProductID,
+        ProductName,
+        UnitPrice,
+        ChangeDate,
+        ROW_NUMBER() OVER (PARTITION BY ProductID, EXTRACT(YEAR FROM ChangeDate) ORDER BY UnitPrice DESC) AS Ranking
+    FROM 
+        product_history
+)
+SELECT 
+    Year,
+    ProductID,
+    ProductName,
+    UnitPrice AS Price,
+    ChangeDate AS Date,
+    Ranking
+FROM 
+    ranked_prices
+WHERE 
+    Ranking <= 4
+ORDER BY 
+    Year, ProductID, Ranking;
+
 ```
+
+
+![w:700](_img/zad9.png)
 
 
 Spróbuj uzyskać ten sam wynik bez użycia funkcji okna, porównaj wyniki, czasy i plany zapytań. Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 
 ```sql
---- wyniki ...
+SELECT EXTRACT(YEAR FROM ph1.date) AS Year,
+       ph1.ProductID,
+       p.ProductName,
+       ph1.UnitPrice,
+       ph1.date,
+       COUNT(ph2.UnitPrice)        AS Ranking
+FROM product_history ph1
+         JOIN
+     product_history ph2 ON ph1.ProductID = ph2.ProductID
+         JOIN
+     products p ON ph1.ProductID = p.ProductID
+         AND EXTRACT(YEAR FROM ph1.date) = EXTRACT(YEAR FROM ph2.date)
+         AND ph1.UnitPrice < ph2.UnitPrice
+GROUP BY Year, ph1.ProductID, p.ProductName, ph1.UnitPrice, ph1.date
+HAVING COUNT(ph2.UnitPrice) <= 4
+ORDER BY Year, ph1.ProductID, Ranking;
 ```
+
+Przeprowadzono analizę dla różnych SZBD
+
+| metoda       | czas[s]  |
+|--------------|----------|
+| Postgres     | 28.5     |
+| MSSQL        | 40.5     |
+| SQLite       | ??? (ponad 300s)  |
+
+
+![w:700](_img/zad9-por-mssql.png)
+![w:700](_img/zad9-por-postgres.png)
+
+Widzimy, że w obu systemach głównym kosztem jest agregowanie i odpowiednie joinowanie tablic.
 
 ---
 # Zadanie 10 - obserwacja

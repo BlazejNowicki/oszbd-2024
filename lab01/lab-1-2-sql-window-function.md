@@ -386,7 +386,7 @@ order by date;
 ```
 
 ```sql
--- wyniki ...
+Funckje lag i lead pozwalają na dostęp do wartości odpowiednio z poprzednich i kolejnych wierszy. Mogą być przydatne by porównywać wartości w różnych punktach czasu
 ```
 
 
@@ -395,8 +395,51 @@ Zadanie
 Spróbuj uzyskać ten sam wynik bez użycia funkcji okna, porównaj wyniki, czasy i plany zapytań. Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 ```sql
--- wyniki ...
+SELECT
+    curr.productid,
+    curr.productname,
+    curr.categoryid,
+    curr.date,
+    curr.unitprice,
+    prev.unitprice AS previousprodprice,
+    next.unitprice AS nextprodprice
+FROM
+    product_history curr
+LEFT JOIN
+    product_history prev ON curr.productid = prev.productid
+    AND prev.date = (
+        SELECT MAX(date)
+        FROM product_history
+        WHERE productid = curr.productid AND date < curr.date
+    )
+LEFT JOIN
+    product_history next ON curr.productid = next.productid
+    AND next.date = (
+        SELECT MIN(date)
+        FROM product_history
+        WHERE productid = curr.productid AND date > curr.date
+    )
+WHERE
+    curr.productid = 2
+    AND YEAR(curr.date) = 2022
+ORDER BY
+    curr.date;
+
+-- Koszt takiego zapytania jest GRUBO większy niż z użyciem LAG/LEAD.
+-- Zapytania z użyciem funkcji okna były ok 40 razy szybsze.
 ```
+| koszt    | postgres | mssql | sqlite |
+|----------|----------|-------|--------|
+| lag/lead | 7.66e3   | 23    | ?      |
+| joiny    | 5.67e9   | 8039  | ?      |
+
+
+| czas     | postgres | mssql | sqlite |
+|----------|----------|-------|-------|
+| lag/lead | 0.5s     | 0.19s | 0.3s  |
+| joiny    | 16.6s    | 14.5s | 11.4s |
+
+
 
 ---
 # Zadanie 11
@@ -414,7 +457,39 @@ Zbiór wynikowy powinien zawierać:
 - wartość poprzedniego zamówienia danego klienta.
 
 ```sql
--- wyniki ...
+WITH OrderValues AS (
+    SELECT
+        o.OrderID,
+        o.CustomerID,
+        o.OrderDate,
+        o.Freight,
+        SUM(od.UnitPrice * od.Quantity * (1 - od.Discount)) AS TotalValue
+    FROM orders o
+    INNER JOIN orderdetails od ON o.OrderID = od.OrderID
+    GROUP BY o.OrderID, o.CustomerID, o.OrderDate, o.Freight
+),
+    RankedOrders AS (
+    SELECT
+        c.CompanyName AS CustomerName,
+        ov.OrderID,
+        ov.OrderDate,
+        ov.TotalValue + ov.Freight AS OrderValue,
+        LAG(ov.OrderID) OVER(PARTITION BY ov.CustomerID ORDER BY ov.OrderDate) AS PreviousOrderID,
+        LAG(ov.OrderDate) OVER(PARTITION BY ov.CustomerID ORDER BY ov.OrderDate) AS PreviousOrderDate,
+        LAG(ov.TotalValue + ov.Freight) OVER(PARTITION BY ov.CustomerID ORDER BY ov.OrderDate) AS PreviousOrderValue
+    FROM OrderValues ov
+    INNER JOIN customers c ON ov.CustomerID = c.CustomerID
+)
+SELECT
+    CustomerName,
+    OrderID,
+    OrderDate,
+    OrderValue,
+    PreviousOrderID,
+    PreviousOrderDate,
+    PreviousOrderValue
+FROM RankedOrders
+ORDER BY CustomerName, OrderDate;
 ```
 
 
@@ -501,8 +576,21 @@ Spróbuj wykonać zadanie bez użycia funkcji okna. Spróbuj uzyskać ten sam wy
 
 Wykonaj kilka "własnych" przykładowych analiz. Czy są jeszcze jakieś ciekawe/przydatne funkcje okna (z których nie korzystałeś w ćwiczeniu)? Spróbuj ich użyć w zaprezentowanych przykładach.
 
+
+Przykładowa analiza z wykorzystaniem funkcji okna `CUME_DIST()`. Szeregujemy klientów po tym ile wydali i dla każdego określamy jaka część klientów wydała więcej niż oni.
 ```sql
--- wyniki ...
+SELECT
+    CustomerID,
+    TotalOrderValue,
+    CUME_DIST() OVER (ORDER BY TotalOrderValue DESC) AS CumulativeDistribution
+FROM
+    (SELECT
+        o.CustomerID,
+        SUM(od.UnitPrice * od.Quantity * (1 - od.Discount)) AS TotalOrderValue
+     FROM Orders o
+     INNER JOIN OrderDetails od ON o.OrderID = od.OrderID
+     GROUP BY o.CustomerID) AS CustomerOrderValues
+ORDER BY TotalOrderValue DESC;
 ```
 
 

@@ -5,7 +5,9 @@
 
 ---
 **Imię i nazwisko:**
-
+Wojciech Jasiński
+Błażej Nowicki
+Przemysław Węglik
 --- 
 
 
@@ -62,26 +64,28 @@ Oprogramowanie dostępne jest na przygotowanej maszynie wirtualnej
 Wykonaj i porównaj wyniki następujących poleceń.
 
 ```sql
-select _avg_(unitprice) avgprice
+select avg(unitprice) avgprice
 from products p;
 
-select _avg_(unitprice) over () as avgprice
+select avg(unitprice) over () as avgprice
 from products p;
 
-select categoryid, _avg_(unitprice) avgprice
+select categoryid, avg(unitprice) avgprice
 from products p
 group by categoryid
 
-select _avg_(unitprice) over (partition by categoryid) as avgprice
+select avg(unitprice) over (partition by categoryid) as avgprice
 from products p;
 ```
 
 Jaka jest są podobieństwa, jakie różnice pomiędzy grupowaniem danych a działaniem funkcji okna?
 
 ```
-
+1. Średnia dla wszystkich produktów.
+2. Zapytanie używa funkcji okna, zwraca tę samą wartość liczbową co zapytanie nr 1, ale dodaje te wartość dla każdego produktu.
+3. Zapytanie grupujące, oblicza średnią wartość dla każdej z grup, rozróżnianych przed categoryid.
+4. Zapytanie używa funkcji okna. Od zapytania nr 2 odróżnia je to, że tym razem średnią liczymy na grupach produktów które łączy to samo categoryid (definiowane przez instrukcje partitionby). Wartości są zwracane dla każðego produktu podobnie jak w zapytaniu nr 2.
 ```
-
 ---
 # Zadanie 2 - obserwacja
 
@@ -91,21 +95,41 @@ Wykonaj i porównaj wyniki następujących poleceń.
 --1)
 
 select p.productid, p.ProductName, p.unitprice,
-       (select _avg_(unitprice) from products) as avgprice
+       (select avg(unitprice) from products) as avgprice
 from products p
 where productid < 10
 
 --2)
 select p.productid, p.ProductName, p.unitprice,
-       _avg_(unitprice) over () as avgprice
+       avg(unitprice) over () as avgprice
 from products p
 where productid < 10
 ```
 
 
-Jaka jest różnica? Czego dotyczy warunek w każdym z przypadków? Napisz polecenie równoważne 
-- 1) z wykorzystaniem funkcji okna. Napisz polecenie równoważne 
-- 1) z wykorzystaniem podzapytania
+Jaka jest różnica? Czego dotyczy warunek w każdym z przypadków?  
+1) Napisz polecenie równoważne z wykorzystaniem funkcji okna. 
+2) Napisz polecenie równoważne z wykorzystaniem podzapytania
+
+```
+Zapytanie nr 1 liczy średnią z cen wszystkich produktów. Zapytanie nr 2 liczy średnią tylko z cen produktów wybranych przez to zapytanie (czyli spełniających warunek z klauzuli WHERE).
+```
+```sql
+-- Zapytanie nr 1 napisane przy pomocy funkcji okna:
+-- w postgress i sqlite limit 10
+select top 10 p.productid, p.ProductName, p.unitprice, 
+    avg(unitprice) over () as avgprice 
+from products p
+order by productid
+
+-- Zapytanie nr 2 napisane przy użyciu podzapytania:
+
+select p.productid, p.ProductName, p.unitprice,
+       (select avg(unitprice) from products where productid < 10) as avgprice
+from products p
+where productid < 10
+
+```
 
 # Zadanie 3
 
@@ -130,7 +154,39 @@ W DataGrip użyj opcji Explain Plan/Explain Analyze
 
 
 ```sql
--- wyniki ...
+-- subquery
+SELECT p.productid,
+       p.ProductName,
+       p.unitprice,
+       (SELECT AVG(unitprice) FROM products) AS avgprice
+FROM products p
+
+-- window function
+SELECT p.productid,
+       p.ProductName,
+       p.unitprice,
+       AVG(unitprice) OVER () AS avgprice
+FROM products p
+
+-- join
+SELECT p.productid,
+       p.ProductName,
+       p.unitprice,
+       AVG(pp.unitprice) AS avgprice
+FROM products p
+         CROSS JOIN products pp
+GROUP BY p.productid, p.ProductName, p.unitprice
+
+```
+Subquery:
+![w:700](_img/zad3_subquery.jpg)
+Join:
+![w:700](_img/zad3_join.jpg)
+Funkcja okna:
+![w:700](_img/zad3_window.jpg)
+
+```
+Funkcja okna ma najmniejszy koszt. Znajduje sie w niej jeden full index scan, którego koszt jest najwyższy.
 ```
 
 ---
@@ -146,7 +202,34 @@ Napisz polecenie z wykorzystaniem podzapytania, join'a oraz funkcji okna. Porów
 Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 ```sql
--- wyniki ...
+-- SQLites
+-- subquery
+SELECT p.ProductID,
+       p.ProductName,
+       p.UnitPrice,
+       (SELECT AVG(pp.UnitPrice) FROM products pp WHERE pp.CategoryID == p.CategoryID) AS avgprice
+FROM products p
+    WHERE p.UnitPrice > avgprice
+
+--join
+SELECT p.ProductID,
+       p.ProductName,
+       p.UnitPrice,
+       AVG(pp.unitprice) AS avgprice
+FROM products p
+        LEFT JOIN products pp ON pp.CategoryID = p.CategoryID
+GROUP BY p.productid, p.ProductName, p.unitprice
+HAVING p.UnitPrice > avgprice
+
+--window function
+SELECT *
+FROM (SELECT p.ProductID,
+             p.ProductName,
+             p.UnitPrice,
+             AVG(p.UnitPrice) OVER (PARTITION BY p.CategoryID)
+                 AS avgprice
+      FROM products p) t
+WHERE t.UnitPrice > t.avgprice
 ```
 
 
@@ -253,7 +336,15 @@ where 1=1;
 
 Wykonaj polecenia: `select count(*) from product_history`,  potwierdzające wykonanie zadania
 
+
+```sql
+select count(*) from product_history
+--- wynik był taki sam w każdym systemie:
+2310000
+```
+
 ![w:700](_img/product_history.png)
+
 
 ---
 # Zadanie 6
@@ -600,9 +691,28 @@ from products
 order by categoryid, unitprice desc;
 ```
 
-```sql
--- wyniki ...
+![w:700](_img/zad12.png)
+
 ```
+Funkcje okna mają zasięg działania (RANGE). Jeśli używamy ORDER BY i nie podamy RANGE to domyślne wartości to:
+RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW. Oznacza to, że wybierzemy najmniejszą wartość między pierwszym, a obecnym wierszem tabeli. W zadaniu ponieważ mamy tam klauzulę: order by categoryid, unitprice desc to tabel już jest posortowana po cenie, daltego otrzyujemy zawsze przedmiot z obecnego wierszu (jest najtańszy w oknie)
+Prawidłowo napisane zapytanie będzie wyglądać tak:
+```
+
+```sql
+SELECT productid,
+       productname,
+       unitprice,
+       categoryid,
+       FIRST_VALUE(productname) OVER (PARTITION BY categoryid
+           ORDER BY unitprice DESC)                                                            first,
+       LAST_VALUE(productname) OVER (PARTITION BY categoryid
+           ORDER BY unitprice DESC RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) last
+FROM products
+ORDER BY categoryid, unitprice DESC;
+```
+
+![w:700](_img/zad12-2.png)
 
 Zadanie
 

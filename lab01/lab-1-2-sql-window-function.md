@@ -749,6 +749,25 @@ ORDER BY
 | lag/lead | 0.5s     | 0.19s | 0.3s  |
 | joiny    | 16.6s    | 14.5s | 11.4s |
 
+MSSQL joins
+![zad 10 mssql.png](_img%2Fzad%2010%20mssql.png)
+MSSQL window
+![zad 10 mssql window.png](_img%2Fzad%2010%20mssql%20window.png)
+
+POSTGRES joins
+![zad 10 postgres.png](_img%2Fzad%2010%20postgres.png)
+POSTGRES window
+![zad 10 postgres window.png](_img%2Fzad%2010%20postgres%20window.png)
+
+SQLITE joins
+![zad 10 sqlite.png](_img%2Fzad%2010%20sqlite.png)
+SQLITE window
+![zad 10 sqlite window.png](_img%2Fzad%2010%20sqlite%20window.png)
+
+
+Porównując powyższe plany w oczy rzuca się jedynie jak skomplikowanie wygląda plan 
+przy funcji okna w MSSQL wględem PostgreSQL. Jest to spowodowane prawdopodobnie 
+różnicami w indeksowaniu w tych dwóch SZBD
 
 
 ---
@@ -992,8 +1011,13 @@ ORDER BY
 ```
 
 Nie się wykonać powyższego zapytania w żadnym z SZBD z uwagi na zbyt długi czas wykonywania >10min.
-![zad14_mssql_subquery.png](zad14%2Fzad14_mssql_subquery.png)
-![zad14_mssql_window.png](zad14%2Fzad14_mssql_window.png)
+
+Zapytanie z użyciem potężnego subquery (mssql)
+![zad14_mssql_subquery.png](_img/zad14_mssql_subquery.png)
+
+
+Zapytanie z użyciem funkcji okna (mssql)
+![zad14_mssql_window.png](_img/zad14_mssql_window.png)
 Widzimy dużą różnicę w kosztach zapytań. To podzapytania ze skomplikowanym 
 filtrem jest bardzo kosztowne - operacja filtrowania nijak nie może zostać
 uproszczona i to ona sprawia, że zapytanie jest wolne.
@@ -1006,7 +1030,7 @@ Wykonaj kilka "własnych" przykładowych analiz. Czy są jeszcze jakieś ciekawe
 
 
 1. Przykładowa analiza z wykorzystaniem funkcji okna `CUME_DIST()`. Szeregujemy klientów po tym ile wydali i dla każdego określamy jaka część klientów wydała więcej niż oni.
-![zad15_1.png](zad15%2Fzad15_1.png)
+   ![zad15_1.png](./_img/zad15_1.png)
 ```sql
 SELECT
     CustomerID,
@@ -1022,7 +1046,7 @@ FROM
 ORDER BY TotalOrderValue DESC;
 ```
 2. Odpowiednia definicja okna z `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW` pozwala skutecznie liczyć średnie kroczące.
-![zad15_3.png](zad15%2Fzad15_3.png)
+  ![zad15_3.png](_img%2Fzad15_3.png)
 ```sql
 WITH MonthlySales AS (
     SELECT
@@ -1046,7 +1070,7 @@ ORDER BY ProductID, OrderMonth;
 ```
 
 3. % wzrostu sprzedaży względem tego jak było rok temu, przy użyciu LAG.
-![zad15_2.png](zad15%2Fzad15_2.png)
+   ![zad15_2.png](_img/zad15_2.png)
 ```sql
 WITH MonthlySales AS (
     SELECT

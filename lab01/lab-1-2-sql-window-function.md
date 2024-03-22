@@ -79,7 +79,7 @@ from products p;
 Jaka jest są podobieństwa, jakie różnice pomiędzy grupowaniem danych a działaniem funkcji okna?
 
 ```
--- wyniki ...
+
 ```
 
 ---
@@ -253,9 +253,7 @@ where 1=1;
 
 Wykonaj polecenia: `select count(*) from product_history`,  potwierdzające wykonanie zadania
 
-```sql
---- wyniki ...
-```
+![w:700](_img/product_history.png)
 
 ---
 # Zadanie 6
@@ -270,11 +268,58 @@ Napisz polecenie z wykorzystaniem podzapytania, join'a oraz funkcji okna. Porów
 
 Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
-
+🧠❓Wyniki przeanalizowano na następujących zapytaniach:
 ```sql
---- wyniki ...
+-- join
+select p.productid, p.ProductName, p.unitprice, avg(pp.unitprice) as AvgCatPrice
+from product_history p
+         join product_history pp on p.categoryid = pp.categoryid
+group by p.productid, p.ProductName, p.unitprice
+having avg(pp.unitprice) < p.unitprice
+order by p.productid
+
+-- subquery
+select *
+from (select p.productid,
+             p.ProductName,
+             p.unitprice,
+             (select avg(pp.unitprice)
+              from product_history pp
+              where pp.categoryid = p.categoryid) as avg_price_in_category
+      from product_history p) t
+where t.unitprice > t.avg_price_in_category
+
+-- window function
+select *
+from (select p.productid,
+             p.ProductName,
+             p.unitprice,
+             avg(p.unitprice) over (partition by p.categoryid) as avg_price_in_category
+      from product_history p) t
+where t.avg_price_in_category < t.unitprice
 ```
 
+![w:700](_img/zad6_analysis.png)
+
+Przeprowadzono analizy w postgresql odpowiednio dla join'a, podzapytania i funkcji okna. Otrzymano następujące rezultaty:
+
+| metoda       | koszt | czas[ms] |
+|--------------|-------|----------|
+| join         | 55.86 | 215      |
+| podzapytanie | 47.45 | 770      |
+| funkcja okna | 38.07 | 650      |
+
+Według analizy plany dla joina i podzapytania wyglądają podobnie z dwoma operacjami 'Full Index Scan' kazdy. 
+Róznia się miejscem agregacji gdzie jedna jest przed 'Hash Join' dla podzapytania a dla funkcji join po.
+Pozdapytanie uzyskuje mniejszy sumaryczny koszt 47 w porównaniu do 55
+
+Najbardziej optymalna z punktu widzenia analizy wydaje się funkcja okna gdzie 
+robimy tylko jeden "Full Index Scan" a sumaryczny koszt wynosi 38
+
+W praktyce pomiar czasu pokazuje ze join jest dwa razy szybszy niz pozostałe metody
+
+Próby wykonania zapytań dla duzej tabeli product_history w dokerze dla postgresql i sqlite kończyły sie zawieszeniem baz. 
+Połączenie sprawdzono i proste zapytania kończyły się sukcesem jak np select count(*) na tej samej tabeli. Dla sqlite brak efektu nawet jak zostawiłem zapytanie na 30min.
 
 ---
 # Zadanie 7
@@ -297,8 +342,99 @@ Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 
 ```sql
---- wyniki ...
+--funkcja okna
+select id,
+       productid,
+       productname,
+       unitprice,
+       avg(unitprice) over (partition by categoryid),
+       sum(value) over (partition by categoryid),
+       avg(unitprice) over (partition by year(date)), -- / datepart('year', date) / strftime('%Y', date)
+       sum(value) over (partition by year(date)) -- / datepart('year', date) / strftime('%Y', date)
+from product_history
+
+--podzapytanie
+select p.id,
+       p.productid,
+       p.productname,
+       p.unitprice,
+       (select avg(pp.unitprice) as avg_price_in_cat
+        from product_history pp
+        where pp.categoryid = p.categoryid),
+       (select sum(pp.value)
+        from product_history pp
+        where pp.categoryid = p.categoryid),
+       (select avg(pp.unitprice) as avg_price_in_year
+        from product_history pp
+        where year(pp.date) = year(p.date)), -- ...
+       (select sum(pp.value) as total_value_in_year
+        from product_history pp
+        where year(pp.date) = year(p.date)) -- ...
+from product_history p
+
+--join
+select p.id,
+       p.productid,
+       p.productname,
+       p.unitprice,
+       avg(pc.unitprice),
+       sum(pc.value),
+       avg(py.unitprice),
+       sum(py.value)
+from product_history p
+         join product_history pc on p.categoryid = pc.categoryid
+         join product_history py on year(p.date) = year(p.date)
+where p.id < 1000
+  and pc.id < 1000
+  and py.id < 1000
+group by p.id, p.productid, p.productname, p.unitprice
 ```
+#### SQL Server
+
+Funkcja okna - 4s
+
+![w:700](/_img/zad7_okno.png)
+
+Przeprowadza tylko jeden index scan. Szybka i prosty plan wykonania
+
+Podzapytania - 4s
+
+![w:700](/_img/zad7_podzapytanie.png)
+
+Skomplikowany plan wykonania ale szybka. Przeprowadza wiele skanów bazy ale kazdy mocno ograniczony
+
+Join - DNF
+
+![w:700](/_img/zad7_join.png)
+
+Liczba operacji rzędu długości tabeli ^3. Próba 15 minutowa na pełnej tabeli. Widac za to ze sql server zrównolegla zapytania i dobrze wykorzystuje zasoby.
+
+![w:700](/_img/zad7_cpu.png)
+
+Plan operacji udało sie wykonać tylko po dodatkowych klauzlach where < n na id w tabelach
+
+#### Postgres
+
+Funkcja okna - 1.5s
+
+Podzapytanie - DNF
+
+Join - DNF
+
+Słabiej optymalizowane podzapytania. Za to funcja okna okazała sie znacznie szybsza niz w sql server
+Podejrzewana złozonosc dla podzapytania i joina to n^3.
+
+#### SQlite
+
+Funkcja okna - 3s
+
+Podzapytanie - DNF
+
+Join - DNF
+
+Podobnie jak w przypadku postgresql.
+Słabiej optymalizowane podzapytania. Szybka funkcja okna.
+Podejrzewana złozonosc dla podzapytania i joina to n^3.
 
 ---
 # Zadanie 8 - obserwacja
@@ -315,19 +451,48 @@ select productid, productname, unitprice, categoryid,
 from products;
 ```
 
-```sql
---- wyniki ...
-```
+![w:700](/_img/zad8_porownanie.png)
+
+Podzapytania róznią się dla takich samych wartości w kolumnie. 
+
+`row_number` sortuje po unit price i numeruje wiersze
+
+`rank` sortuje po unit price ale dla takich samych wartości przypisuje ten sam numer.
+Dla kolejnych wartości wraca do normalnej numeracji zachowując przerwę
+
+`dense_rank` tak samo jak rank tylko nie zachowuje przerwy po takich samych elementach
 
 
 Zadanie
 
 Spróbuj uzyskać ten sam wynik bez użycia funkcji okna
 
+🔥🔥🔥
 ```sql
---- wyniki ...
+select p.productid,
+       p.productname,
+       p.unitprice,
+       p.categoryid,
+       -- row_number() jest niederministyczne więc taka implementacja zadziała tylko jak dodamy odpowiedni order by
+       (select count(pp.productid) + 1 as q
+        from products pp
+        where (pp.categoryid = p.categoryid and pp.unitprice > p.unitprice)
+           or (pp.categoryid = p.categoryid and pp.unitprice = p.unitprice and pp.productid < p.productid)) as rowno,
+       -- działa zawsze
+       (select count(pp.productid) + 1
+        from products pp
+        where pp.categoryid = p.categoryid
+          and pp.unitprice > p.unitprice)                                                                   as rankprice,
+       -- działa zawsze
+       (select count(t.q) + 1
+        from (select distinct pp.unitprice as q
+              from products pp
+              where pp.categoryid = p.categoryid
+                and pp.unitprice > p.unitprice) t)                                                          as denserankprice
+from products p
+order by p.categoryid, p.unitprice desc, p.productid
 ```
-
+![w:700](_img/zad8_result.png)
 
 ---
 # Zadanie 9

@@ -642,7 +642,7 @@ order by date;
 ```
 
 ```sql
--- wyniki ...
+Funckje lag i lead pozwalają na dostęp do wartości odpowiednio z poprzednich i kolejnych wierszy. Mogą być przydatne by porównywać wartości w różnych punktach czasu
 ```
 
 
@@ -651,8 +651,51 @@ Zadanie
 Spróbuj uzyskać ten sam wynik bez użycia funkcji okna, porównaj wyniki, czasy i plany zapytań. Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 ```sql
--- wyniki ...
+SELECT
+    curr.productid,
+    curr.productname,
+    curr.categoryid,
+    curr.date,
+    curr.unitprice,
+    prev.unitprice AS previousprodprice,
+    next.unitprice AS nextprodprice
+FROM
+    product_history curr
+LEFT JOIN
+    product_history prev ON curr.productid = prev.productid
+    AND prev.date = (
+        SELECT MAX(date)
+        FROM product_history
+        WHERE productid = curr.productid AND date < curr.date
+    )
+LEFT JOIN
+    product_history next ON curr.productid = next.productid
+    AND next.date = (
+        SELECT MIN(date)
+        FROM product_history
+        WHERE productid = curr.productid AND date > curr.date
+    )
+WHERE
+    curr.productid = 2
+    AND YEAR(curr.date) = 2022
+ORDER BY
+    curr.date;
+
+-- Koszt takiego zapytania jest GRUBO większy niż z użyciem LAG/LEAD.
+-- Zapytania z użyciem funkcji okna były ok 40 razy szybsze.
 ```
+| koszt    | postgres | mssql | sqlite |
+|----------|----------|-------|--------|
+| lag/lead | 7.66e3   | 23    | ?      |
+| joiny    | 5.67e9   | 8039  | ?      |
+
+
+| czas     | postgres | mssql | sqlite |
+|----------|----------|-------|-------|
+| lag/lead | 0.5s     | 0.19s | 0.3s  |
+| joiny    | 16.6s    | 14.5s | 11.4s |
+
+
 
 ---
 # Zadanie 11
@@ -670,7 +713,39 @@ Zbiór wynikowy powinien zawierać:
 - wartość poprzedniego zamówienia danego klienta.
 
 ```sql
--- wyniki ...
+WITH OrderValues AS (
+    SELECT
+        o.OrderID,
+        o.CustomerID,
+        o.OrderDate,
+        o.Freight,
+        SUM(od.UnitPrice * od.Quantity * (1 - od.Discount)) AS TotalValue
+    FROM orders o
+    INNER JOIN orderdetails od ON o.OrderID = od.OrderID
+    GROUP BY o.OrderID, o.CustomerID, o.OrderDate, o.Freight
+),
+    RankedOrders AS (
+    SELECT
+        c.CompanyName AS CustomerName,
+        ov.OrderID,
+        ov.OrderDate,
+        ov.TotalValue + ov.Freight AS OrderValue,
+        LAG(ov.OrderID) OVER(PARTITION BY ov.CustomerID ORDER BY ov.OrderDate) AS PreviousOrderID,
+        LAG(ov.OrderDate) OVER(PARTITION BY ov.CustomerID ORDER BY ov.OrderDate) AS PreviousOrderDate,
+        LAG(ov.TotalValue + ov.Freight) OVER(PARTITION BY ov.CustomerID ORDER BY ov.OrderDate) AS PreviousOrderValue
+    FROM OrderValues ov
+    INNER JOIN customers c ON ov.CustomerID = c.CustomerID
+)
+SELECT
+    CustomerName,
+    OrderID,
+    OrderDate,
+    OrderValue,
+    PreviousOrderID,
+    PreviousOrderDate,
+    PreviousOrderValue
+FROM RankedOrders
+ORDER BY CustomerName, OrderDate;
 ```
 
 
@@ -718,9 +793,42 @@ Zadanie
 
 Spróbuj uzyskać ten sam wynik bez użycia funkcji okna, porównaj wyniki, czasy i plany zapytań. Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
+Postgres, sqlite:
 ```sql
--- wyniki ...
+SELECT
+    p.productid,
+    p.productname,
+    p.unitprice,
+    p.categoryid,
+    (SELECT ProductName FROM Products p2 WHERE p2.CategoryID = p.CategoryID ORDER BY UnitPrice DESC LIMIT 1) AS MostExpensiveProductName,
+    (SELECT ProductName FROM Products p3 WHERE p3.CategoryID = p.CategoryID ORDER BY UnitPrice ASC LIMIT 1) AS CheapestProductName
+FROM
+    Products p
+ORDER BY
+    categoryid, unitprice desc;
 ```
+
+MSSQL
+```sql
+SELECT
+    p.productid,
+    p.productname,
+    p.unitprice,
+    p.categoryid,
+    (SELECT top 1 ProductName FROM Products p2 WHERE p2.CategoryID = p.CategoryID ORDER BY UnitPrice DESC) AS MostExpensiveProductName,
+    (SELECT top 1 ProductName FROM Products p3 WHERE p3.CategoryID = p.CategoryID ORDER BY UnitPrice ASC) AS CheapestProductName
+FROM
+    Products p
+ORDER BY
+    categoryid, unitprice desc;
+```
+
+| koszt               | postgres | mssql | sqlite |
+|---------------------|----------|-------|--------|
+| window functions    | 7.07     | 0.018 | ?      |
+| no window functions | 314.69   | 0.256 | ?      |
+
+
 
 ---
 # Zadanie 13
@@ -744,7 +852,42 @@ Zbiór wynikowy powinien zawierać:
 	- wartość tego zamówienia
 
 ```sql
---- wyniki ...
+WITH OrderTotals AS (
+    SELECT
+        o.CustomerID,
+        o.OrderID,
+        o.OrderDate,
+        SUM((od.UnitPrice * od.Quantity) * (1 - od.Discount)) + o.Freight AS TotalValue,
+        YEAR(o.orderdate) AS OrderYear,
+        MONTH(o.orderdate) AS OrderMonth
+    FROM
+        orders o
+        JOIN orderdetails od ON o.OrderID = od.OrderID
+    GROUP BY
+        o.CustomerID, o.OrderID, o.OrderDate, o.Freight
+), MonthlyExtremes AS (
+    SELECT
+        CustomerID,
+        OrderYear,
+        OrderMonth,
+        FIRST_VALUE(OrderID) OVER(PARTITION BY CustomerID, OrderYear, OrderMonth ORDER BY TotalValue ASC) AS MinOrderID,
+        FIRST_VALUE(OrderID) OVER(PARTITION BY CustomerID, OrderYear, OrderMonth ORDER BY TotalValue DESC) AS MaxOrderID
+    FROM OrderTotals
+)
+SELECT
+    DISTINCT me.CustomerID,
+    me.OrderYear,
+    me.OrderMonth,
+    me.MinOrderID,
+    otMin.OrderDate AS MinOrderDate,
+    otMin.TotalValue AS MinTotalValue,
+    me.MaxOrderID,
+    otMax.OrderDate AS MaxOrderDate,
+    otMax.TotalValue AS MaxTotalValue
+FROM MonthlyExtremes me
+JOIN OrderTotals otMin ON me.MinOrderID = otMin.OrderID
+JOIN OrderTotals otMax ON me.MaxOrderID = otMax.OrderID
+ORDER BY me.CustomerID, me.OrderYear, me.OrderMonth;
 ```
 
 ---
@@ -762,22 +905,61 @@ Zbiór wynikowy powinien zawierać:
 - wartość sprzedaży produktu narastające od początku miesiąca
 
 ```sql
--- wyniki ...
+SELECT
+    id,
+    productid,
+    date,
+    value,
+    SUM(value) OVER (PARTITION BY productid, YEAR(date), MONTH(date) ORDER BY date) AS cumulative_sales
+FROM
+    product_history
+order by productid, date
 ```
 
 Spróbuj wykonać zadanie bez użycia funkcji okna. Spróbuj uzyskać ten sam wynik bez użycia funkcji okna, porównaj wyniki, czasy i plany zapytań. Przetestuj działanie w różnych SZBD (MS SQL Server, PostgreSql, SQLite)
 
 ```sql
--- wyniki ...
+SELECT
+    ph1.id,
+    ph1.productid,
+    ph1.date,
+    ph1.value,
+    (SELECT SUM(ph2.value)
+     FROM product_history ph2
+     WHERE ph2.productid = ph1.productid
+       AND YEAR(ph2.date) = YEAR(ph1.date)
+       AND MONTH(ph2.date) = MONTH(ph1.date)
+       AND ph2.date <= ph1.date) AS cumulative_sales
+FROM
+    product_history ph1
+ORDER BY
+    ph1.productid, ph1.date;
+
 ```
+
+Nie udało mi się wykonać powyższego zapytania w żadnym z SZBD z uwagi na zbyt długi czas wykonywania >10min.
+
 
 ---
 # Zadanie 15
 
 Wykonaj kilka "własnych" przykładowych analiz. Czy są jeszcze jakieś ciekawe/przydatne funkcje okna (z których nie korzystałeś w ćwiczeniu)? Spróbuj ich użyć w zaprezentowanych przykładach.
 
+
+Przykładowa analiza z wykorzystaniem funkcji okna `CUME_DIST()`. Szeregujemy klientów po tym ile wydali i dla każdego określamy jaka część klientów wydała więcej niż oni.
 ```sql
--- wyniki ...
+SELECT
+    CustomerID,
+    TotalOrderValue,
+    CUME_DIST() OVER (ORDER BY TotalOrderValue DESC) AS CumulativeDistribution
+FROM
+    (SELECT
+        o.CustomerID,
+        SUM(od.UnitPrice * od.Quantity * (1 - od.Discount)) AS TotalOrderValue
+     FROM Orders o
+     INNER JOIN OrderDetails od ON o.OrderID = od.OrderID
+     GROUP BY o.CustomerID) AS CustomerOrderValues
+ORDER BY TotalOrderValue DESC;
 ```
 
 

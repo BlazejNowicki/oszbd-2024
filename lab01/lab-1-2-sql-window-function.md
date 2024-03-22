@@ -337,7 +337,9 @@ where 1=1;
 Wykonaj polecenia: `select count(*) from product_history`,  potwierdzające wykonanie zadania
 
 ```sql
---- wyniki ...
+select count(*) from product_history
+--- wynik był taki sam w każdym systemie:
+2310000
 ```
 
 ---
@@ -518,9 +520,28 @@ from products
 order by categoryid, unitprice desc;
 ```
 
-```sql
--- wyniki ...
+![w:700](_img/zad12.png)
+
 ```
+Funkcje okna mają zasięg działania (RANGE). Jeśli używamy ORDER BY i nie podamy RANGE to domyślne wartości to:
+RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW. Oznacza to, że wybierzemy najmniejszą wartość między pierwszym, a obecnym wierszem tabeli. W zadaniu ponieważ mamy tam klauzulę: order by categoryid, unitprice desc to tabel już jest posortowana po cenie, daltego otrzyujemy zawsze przedmiot z obecnego wierszu (jest najtańszy w oknie)
+Prawidłowo napisane zapytanie będzie wyglądać tak:
+```
+
+```sql
+SELECT productid,
+       productname,
+       unitprice,
+       categoryid,
+       FIRST_VALUE(productname) OVER (PARTITION BY categoryid
+           ORDER BY unitprice DESC)                                                            first,
+       LAST_VALUE(productname) OVER (PARTITION BY categoryid
+           ORDER BY unitprice DESC RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) last
+FROM products
+ORDER BY categoryid, unitprice DESC;
+```
+
+![w:700](_img/zad12-2.png)
 
 Zadanie
 

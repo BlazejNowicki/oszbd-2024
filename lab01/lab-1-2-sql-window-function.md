@@ -697,9 +697,7 @@ where productid = 1 and year(date) = 2022
 order by date;
 ```
 
-```sql
-Funckje lag i lead pozwalają na dostęp do wartości odpowiednio z poprzednich i kolejnych wierszy. Mogą być przydatne by porównywać wartości w różnych punktach czasu
-```
+Funckje `lag` i `lead` pozwalają na dostęp do wartości odpowiednio z poprzednich i kolejnych wierszy. Mogą być przydatne by porównywać wartości w różnych punktach czasu
 
 
 Zadanie
@@ -751,6 +749,25 @@ ORDER BY
 | lag/lead | 0.5s     | 0.19s | 0.3s  |
 | joiny    | 16.6s    | 14.5s | 11.4s |
 
+MSSQL joins
+![zad 10 mssql.png](_img%2Fzad%2010%20mssql.png)
+MSSQL window
+![zad 10 mssql window.png](_img%2Fzad%2010%20mssql%20window.png)
+
+POSTGRES joins
+![zad 10 postgres.png](_img%2Fzad%2010%20postgres.png)
+POSTGRES window
+![zad 10 postgres window.png](_img%2Fzad%2010%20postgres%20window.png)
+
+SQLITE joins
+![zad 10 sqlite.png](_img%2Fzad%2010%20sqlite.png)
+SQLITE window
+![zad 10 sqlite window.png](_img%2Fzad%2010%20sqlite%20window.png)
+
+
+Porównując powyższe plany w oczy rzuca się jedynie jak skomplikowanie wygląda plan 
+przy funcji okna w MSSQL wględem PostgreSQL. Jest to spowodowane prawdopodobnie 
+różnicami w indeksowaniu w tych dwóch SZBD
 
 
 ---
@@ -993,7 +1010,17 @@ ORDER BY
 
 ```
 
-Nie udało mi się wykonać powyższego zapytania w żadnym z SZBD z uwagi na zbyt długi czas wykonywania >10min.
+Nie się wykonać powyższego zapytania w żadnym z SZBD z uwagi na zbyt długi czas wykonywania >10min.
+
+Zapytanie z użyciem potężnego subquery (mssql)
+![zad14_mssql_subquery.png](_img/zad14_mssql_subquery.png)
+
+
+Zapytanie z użyciem funkcji okna (mssql)
+![zad14_mssql_window.png](_img/zad14_mssql_window.png)
+Widzimy dużą różnicę w kosztach zapytań. To podzapytania ze skomplikowanym 
+filtrem jest bardzo kosztowne - operacja filtrowania nijak nie może zostać
+uproszczona i to ona sprawia, że zapytanie jest wolne.
 
 
 ---
@@ -1002,7 +1029,8 @@ Nie udało mi się wykonać powyższego zapytania w żadnym z SZBD z uwagi na zb
 Wykonaj kilka "własnych" przykładowych analiz. Czy są jeszcze jakieś ciekawe/przydatne funkcje okna (z których nie korzystałeś w ćwiczeniu)? Spróbuj ich użyć w zaprezentowanych przykładach.
 
 
-Przykładowa analiza z wykorzystaniem funkcji okna `CUME_DIST()`. Szeregujemy klientów po tym ile wydali i dla każdego określamy jaka część klientów wydała więcej niż oni.
+1. Przykładowa analiza z wykorzystaniem funkcji okna `CUME_DIST()`. Szeregujemy klientów po tym ile wydali i dla każdego określamy jaka część klientów wydała więcej niż oni.
+   ![zad15_1.png](./_img/zad15_1.png)
 ```sql
 SELECT
     CustomerID,
@@ -1017,6 +1045,76 @@ FROM
      GROUP BY o.CustomerID) AS CustomerOrderValues
 ORDER BY TotalOrderValue DESC;
 ```
+2. Odpowiednia definicja okna z `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW` pozwala skutecznie liczyć średnie kroczące.
+  ![zad15_3.png](_img%2Fzad15_3.png)
+```sql
+WITH MonthlySales AS (
+    SELECT
+        productId,
+        date_trunc('month', orderdate) as OrderMonth,
+        SUM(Quantity * UnitPrice) AS TotalSales
+    FROM Orders
+    JOIN orderdetails ON Orders.OrderID = orderdetails.OrderID
+    GROUP BY ProductID, OrderMonth
+)
+SELECT
+    ProductID,
+    TO_CHAR(OrderMonth, 'YYYY-MM'),
+    TotalSales,
+    AVG(TotalSales) OVER(PARTITION BY ProductID ORDER BY OrderMonth
+                         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS MovingAvgSales
+FROM MonthlySales
+where productid = 1
+ORDER BY ProductID, OrderMonth;
+
+```
+
+3. % wzrostu sprzedaży względem tego jak było rok temu, przy użyciu LAG.
+   ![zad15_2.png](_img/zad15_2.png)
+```sql
+WITH MonthlySales AS (
+    SELECT
+        YEAR(o.orderdate) AS Year,
+        MONTH(o.orderdate) AS Month,
+        c.categoryname,
+        SUM(od.unitprice * od.quantity * (1 - od.discount)) AS MonthlySales
+    FROM orders o
+    INNER JOIN orderdetails od ON o.orderid = od.orderid
+    INNER JOIN products p ON od.productid = p.productid
+    INNER JOIN categories c ON p.categoryid = c.categoryid
+    GROUP BY YEAR(o.orderdate), MONTH(o.orderdate), c.categoryname
+),
+SalesWithPreviousYear AS (
+    SELECT
+        *,
+        LAG(MonthlySales, 12) OVER(PARTITION BY categoryname ORDER BY Year, Month) AS PreviousYearSales
+    FROM MonthlySales
+),
+GrowthCalculations AS (
+    SELECT
+        Year,
+        Month,
+        categoryname,
+        MonthlySales,
+        PreviousYearSales,
+        CASE
+            WHEN PreviousYearSales IS NULL THEN NULL -- Avoid division by zero and account for no previous year data
+            ELSE (MonthlySales - PreviousYearSales) / PreviousYearSales * 100
+        END AS GrowthPercentage
+    FROM SalesWithPreviousYear
+)
+SELECT
+    Year,
+    Month,
+    categoryname,
+    MonthlySales,
+    PreviousYearSales,
+    GrowthPercentage
+FROM GrowthCalculations
+ORDER BY categoryname, Year, Month;
+
+```
+
 
 
 Punktacja

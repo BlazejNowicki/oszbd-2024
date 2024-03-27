@@ -256,8 +256,9 @@ Jakie są według Ciebie najważniejsze pola?
 ---
 > Wyniki: 
 
-```sql
---  ...
+```
+Najważniejsze wydaje się być `avg_fragmentation_in_percent`, wartości znacznie wyższe niż 0 (wg. dokmentacji -10% może być akceptowalne) sprawiają, że obniżna się efektyność korzystania z indeksu.
+Kolumna `avg_page_space_used_in_percent` także wydaje się istotna. Optymalną wartością jest 100. Im bliżej tej wartości tym efektywniej wypełniamy liście w drzewie. Jeśli wartość jest niska to bardzo nieefektywnie używamy przestrzeni dyskowej.
 ```
 
 ---
@@ -290,8 +291,10 @@ and index_id not in (0) --only clustered and nonclustered indexes
 > Wyniki: 
 > zrzut ekranu/komentarz:
 
-```sql
---  ...
+<img src="_img/zad3-1.png" alt="image" width="500" height="auto">
+
+```
+Te tabele posiadają kolumnę ModifiedDate, co sugeruje, że rekordy są w jakiś sposób update'owane. To może powodować fragmentację indexów
 ```
 
 ---
@@ -320,8 +323,10 @@ and index_id not in (0) --only clustered and nonclustered indexes
 > Wyniki: 
 > zrzut ekranu/komentarz:
 
-```sql
---  ...
+<img src="_img/zad3-2.png" alt="image" width="500" height="auto">
+
+```
+Przebudowy wymagają tylko 3 indeksy - wszystkie na tabeli Person. Rekordy z tej tabeli również są modyfikowane, a dodatkowo jest ona dość spora (w porównaniu do tych z poprzedniego podpunktu), co może powodować dużą liczbę modyfikacji i tym samym fragmentację.
 ```
 
 ---
@@ -333,8 +338,10 @@ Czym się różni przebudowa indeksu od reorganizacji?
 ---
 > Wyniki: 
 
-```sql
---  ...
+```
+Przebudowa oznacza DROP indeksu i utworzenie go do nowa. Może być wykonana online lub offline (wtedy niestaty indeks nie jest dostępny)
+
+Reorganizacja nie usuwa indeksu, tylko restrukturyzuje stronę indeksu. Wykonywana online.
 ```
 
 ---
@@ -345,7 +352,14 @@ Sprawdź co przechowuje tabela sys.dm_db_index_usage_stats:
 > Wyniki: 
 
 ```sql
---  ...
+select * from sys.dm_db_index_usage_stats
+```
+
+<img src="_img/zad3-3.png" alt="image" width="500" height="auto">
+
+
+```
+Tabela zawieraj informacje o różnych operacjach dokonywanych na indeksach i ile razy lub kiedy ich dokonano.
 ```
 
 ---
@@ -391,7 +405,13 @@ Napisz przygotowane komendy SQL do naprawy indeksów:
 > Wyniki: 
 
 ```sql
---  ...
+ALTER INDEX XMLPATH_Person_Demographics ON Person.Person REBUILD WITH (MAXDOP = 1);
+ALTER INDEX XMLPROPERTY_Person_Demographics ON Person.Person REBUILD WITH (MAXDOP = 1);
+ALTER INDEX XMLVALUE_Person_Demographics ON Person.Person REBUILD WITH (MAXDOP = 1);
+```
+
+```
+MAXDOP = 1 jest konieczne, ozancza ono, że tylko jeden proces będzie wykonywał przebudowywanie indeksu. Wszystko odbędzie się seryjnie. Zwiększa to wydajność indeksu i zmneijsza fragmentację, ale trwa dłużej. Bez tego paramteru indeksy wciąż pojawiały się jako kandydaci do przebudowania.
 ```
 
 ---
@@ -419,8 +439,8 @@ Zapisz sobie kilka różnych typów stron, dla różnych indeksów:
 ---
 > Wyniki: 
 
-```sql
---  ...
+```
+Otrzymano PageType: 1,2,3 i 10. Typ 10 oznacza, że na tej stronie znajduje się sam indeks. Na stronach typu 1 znajduą się dane, typu 2 znajdują sie dane indkesowe, typ 3 dane tekstowe.
 ```
 
 ---
@@ -443,8 +463,9 @@ Zapisz obserwacje ze stron. Co ciekawego udało się zaobserwować?
 ---
 > Wyniki: 
 
-```sql
---  ...
+```
+Dostajemy header strony z różnymi metadanymi, np. numerami stron poprzedniej i kolejnej, liczbą wolnych danych itp.
+Następnie dostajemy surowy dump całej strony.
 ```
 
 ---

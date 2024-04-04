@@ -18,6 +18,10 @@
 
 **Imię i nazwisko:**
 
+Błażej Nowicki,
+Wojciech Jasiński,
+Przemysław Węglik,
+
 --- 
 
 Celem ćwiczenia jest zapoznanie się z planami wykonania zapytań (execution plans), oraz z budową i możliwością wykorzystaniem indeksów.
@@ -148,9 +152,37 @@ Teraz wykonaj poszczególne zapytania (najlepiej każde analizuj oddzielnie). Co
 ---
 > Wyniki: 
 
-```sql
---  ...
-```
+<img src="_img/zad1-1.png">
+
+Zapytanie 1 wykonuje operacje select z klauzulą where na dwóch zjoinowanych tabelach. Zapytanie nie zwraca żadnych wierszy, ponieważ nic nie pasuje do zadanej daty.
+
+Z live query statistics możemy odczytać, że sugerowaną optymalizacją jest stworzenie indeksu na kolumnie `OrderDate` na której wykonujemy operację where.
+
+Z zakładki execution plan możemy odczytać planowane operacje, a z zakładki live query statistics statystyki wykonania tych operacji aktualizowane w czasie rzeczywistym.
+
+W tym przypadku plan składa się jedynie z dwóch table scanów, inner join'a i operacji select.
+
+<img src="_img/zad1-11.png">
+
+Z ciekawości sprawdziliśmy też co się stanie jak się usunie `where` w zapytaniu. Główne operacje jak się można spodziewać pozostają te same jednak zostaną wykonane równolegle.
+
+<img src="_img/zad1-2.png">
+
+Zapytanie zwraca dużo wierszy, stosowane jest wykonanie równoległe.
+
+Sugerowaną modyfikacją jest stworzenie indeksu na kolumnie `salesorderid`co ma na celu przyspieszyć operację join.
+
+Jest to o tyle ciekawe że w poprzednich zapytaniach też występował taki join jednak najbardziej korzystną optymalizają były indeksy przyspieszające where. 
+
+<img src="_img/zad1-3.png">
+
+Zapytanie nie zwraca żadnych wierszy. Sugerowana optymalizacją jest sworznie indeksu na kolumnie orderdate, żeby przyspierszyć operację where.
+
+<img src="_img/zad1-4.png">
+
+Zapytanie zwraca wiersze. W query plan pojawia się etap sortowania wymuszony przez `order by`.
+
+Sugerowana optymalizacją jest sworznie indeksu na kolumnie `carriertrackingnumber`, żeby przyspierszyć operację where.
 
 ---
 
@@ -174,9 +206,12 @@ Sprawdź zakładkę **Tuning Options**, co tam można skonfigurować?
 ---
 > Wyniki: 
 
-```sql
---  ...
-```
+<img src="_img/zad2-1.png">
+
+Możemy wybrać z jakich optymalizacji chcemy skorzystać.
+Do wyboru mamy indeksy, widoki z indeksami itp.
+Możemy też wybrać czy chcemy dodać partitioning oraz które z istniejących PDS chcemy zostawić w bazie.
+
 
 ---
 
@@ -207,9 +242,22 @@ Opisz, dlaczego dane indeksy zostały zaproponowane do zapytań:
 ---
 > Wyniki: 
 
-```sql
---  ...
-```
+<img src="_img/zad2-3.png">
+
+SalesOrderID -> join w 1)
+
+CarrierTrackingNumber, SalesOrderID -> przez join dwóch tabel w 4) z where na carrier tracking number
+
+SalesOrderId ProductID -> przez groupby w 2)
+
+SalesOrderId, SalesOrderDetailId -> join w 1)
+
+SalesOrderId, OrderDate -> join w 3)
+
+SalesOrderId -> join w 1)
+
+OrderDate, SalesOrderId -> join w 3)
+
 
 ---
 
@@ -219,9 +267,19 @@ Sprawdź jak zmieniły się Execution Plany. Opisz zmiany:
 ---
 > Wyniki: 
 
-```sql
---  ...
-```
+<img src="_img/zad2-21.png">
+
+Table scan zamienia się na clustered index seek. A hash match na nested loops.
+
+<img src="_img/zad2-22.png">
+
+Table scan zamienia się na index scan.
+
+<img src="_img/zad2-23.png">
+
+Table scan zamienia się na clustered index seek. A hash match na nested loops.
+<img src="_img/zad2-24.png">
+Table scan zamienia się na index seek. A hash match na nested loops.
 
 ---
 

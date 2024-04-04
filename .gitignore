@@ -1,2 +1,5 @@
 DataGripProjects
+data
 northwind3.sqlite
+.DS_Store
+db.sqlite

@@ -135,6 +135,7 @@ Czy zmienił się plan i czas? Skomentuj dwa podejścia w wyszukiwaniu krotek.
 
 
 🔥 Wyniki: 
+![plan_klastrowany.png](_img%2Fzad1%2Fplan_klastrowany.png)
 
 | clustered | = 594    | between 594 and 610 |
 |-----------|----------|---------------------|

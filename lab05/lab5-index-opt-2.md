@@ -96,11 +96,13 @@ select * from customer where storeid between 594 and 610
 Zanotuj czas zapytania oraz jego koszt koszt:
 
 ---
-> Wyniki: 
+🔥 Wyniki: 
 
-```sql
---  ...
-```
+| no index | = 594    | between 594 and 610 |
+|----------|----------|---------------------|
+| time     | 3-7      | 3-7                 |
+| cost     | 0.139158 | 0.139158            |
+
 
 
 Dodaj indeks:
@@ -112,12 +114,15 @@ create clustered index customer_store_cls_idx on customer(storeid)
 Jak zmienił się plan i czas? Czy jest możliwość optymalizacji?
 
 
----
-> Wyniki: 
+🔥 Wyniki: 
 
-```sql
---  ...
-```
+| nonclustered | = 594      | between 594 and 610 |
+|--------------|------------|---------------------|
+| time         | 0          | 0                   |
+| cost         | 0.00657038 | 0.0510741           |
+
+Czas wykonania jest pomijalnie mały. Indeksowanie dużo poprawiło koszt wykonania dla filtrowania po pojedynczej 
+wartości, dla zakresu mamy ok rząd wielkości większy koszt.
 
 
 Dodaj indeks klastrowany:
@@ -129,12 +134,18 @@ create clustered index customer_store_cls_idx on customer(storeid)
 Czy zmienił się plan i czas? Skomentuj dwa podejścia w wyszukiwaniu krotek.
 
 
----
-> Wyniki: 
+🔥 Wyniki: 
+![plan_klastrowany.png](_img%2Fzad1%2Fplan_klastrowany.png)
 
-```sql
---  ...
-```
+| clustered | = 594    | between 594 and 610 |
+|-----------|----------|---------------------|
+| time      | 0        | 0                   |
+| cost      | 0.0032831 | 0.0032996           |
+
+Przy clustered index roznica miedzy dwoma zapytaniami jest bardzo mala. Indeks klastrowany bardzo dobrze sobie radzi.
+
+
+ TODO porownac z tym jak bylo w ogole przed zalozeniem indeksow
 
 
 

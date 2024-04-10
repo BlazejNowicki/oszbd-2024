@@ -19,6 +19,8 @@ p,li {
 
 **Imię i nazwisko:**
 
+**Wojciech Jasiński, Błażej Nowicki, Przemysław Węglik**
+
 --- 
 
 Celem ćwiczenia jest zapoznanie się z planami wykonania zapytań (execution plans), oraz z budową i możliwością wykorzystaniem indeksów (cz. 2.)

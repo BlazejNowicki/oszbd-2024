@@ -108,14 +108,14 @@ Skomentuj oba zapytania. Czy indeks został użyty w którymś zapytaniu, dlacze
 > Wyniki: 
 
 ```sql
---  ...
+Indeks został użyty w zapytaniu pierwszym, ale nie w zapytaniu drugim. Aby skorzystać z "filtered" indeksu warunek z klauzuli WHERE zapytania musi być podzbiorem z klauzuli WHERE indeksu.
 ```
 
 
 
 # Zadanie 2 – indeksy klastrujące
 
-Celem zadania jest poznanie indeksów klastrujących![](file:////Users/rm/Library/Group%20Containers/UBF8T346G9.Office/TemporaryItems/msohtmlclip/clip_image001.jpg)
+Celem zadania jest poznanie indeksów klastrujących!
 
 Skopiuj ponownie tabelę SalesOrderHeader do swojej bazy danych:
 
@@ -143,7 +143,7 @@ Wypisz ponownie sto pierwszych zamówień. Co się zmieniło?
 > Wyniki: 
 
 ```sql
---  ...
+Po dodaniu indeksu, ID zamówień zostały posortowane rosnąco, bez niego malejąco.
 ```
 
 
@@ -162,14 +162,14 @@ Dodaj sortowanie według OrderDate ASC i DESC. Czy indeks działa w obu przypadk
 > Wyniki: 
 
 ```sql
---  ...
+Sortowanie nie jest wykonywane w żadnym przypadku co sugeruje, że dane są już posortowane wg OrderDate, potem wystarczy zwrócić je w odpowiedniej kolejności (tak jak w indeksie, lub na odwrót)
 ```
 
 
 # Zadanie 3 – indeksy column store
 
 
-Celem zadania jest poznanie indeksów typu column store![](file:////Users/rm/Library/Group%20Containers/UBF8T346G9.Office/TemporaryItems/msohtmlclip/clip_image001.jpg)
+Celem zadania jest poznanie indeksów typu column store!
 
 Utwórz tabelę testową:
 
@@ -230,9 +230,13 @@ Sprawdź różnicę pomiędzy przetwarzaniem w zależności od indeksów. Porów
 
 ---
 > Wyniki: 
+Tylko indeks klastrowany
+<img src="_img/zad3-1.png">
+Indeks nie klastrowany
+<img src="_img/zad3-2.png">
 
 ```sql
---  ...
+Plany są identyczne, z tą różnicą, że podczas "Full index scan" przed dodaniem indeksu nie klastrowanego przejrzano faktycznie wszystkie wiersze ("actual rows"). Po dodaniu indeksu nie klastrowanego ta liczba wynosi 0. W drugim przypadku koszt i czas są dużo niższe.
 ```
 
 # Zadanie 4 – własne eksperymenty

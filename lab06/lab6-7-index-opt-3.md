@@ -267,11 +267,97 @@ Odpowiedź powinna zawierać:
 
 > Wyniki: 
 
-```sql
---  ...
-```
+Do eksperymentów wykorzystaliśmy bazę danych "Wide World Importers" - podobną do AdventureWorks.
 
 
+>1. Klastrowane dla atrybutu nie będącego kluczem głównym
+>
+>
+>```sql
+>SELECT * FROM Sales.Orders WHERE OrderDate BETWEEN '2013-01-03' AND '2013-01-04';
+>```
+>![zad4_1_results.png](_img%2Fzad4_1_results.png)
+>
+>![zad4_1_no_index.png](_img%2Fzad4_1_no_index.png)
+>
+>
+>Wykonujemy zapytanie dla przedziału dat - mimo że niby powinny w tabeli być ułożone chronologicznie, to >potrzebujemy clustered index na dacie, żeby zapytania z przedziałem dat faktycznie były szybsze.
+>
+>```sql
+>CREATE CLUSTERED INDEX IX_Orders_OrderDate ON Sales.Orders(OrderDate);
+>```
+>![zad4_1_clustered_index.png](_img%2Fzad4_1_clustered_index.png)
+
+
+>2. Nieklastrowany indeks
+>
+>Przykładowy indeks nieklastrowany założony na kolumnę z nazwą. Pomaga przy wyszukiwaniu po nazwie.
+>```sql
+>SELECT StockItemID, StockItemName FROM Warehouse.StockItems WHERE StockItemName LIKE '%wheel%';
+>```
+>![zad4_2_results.png](_img%2Fzad4_2_results.png)
+>![zad4_2_no_index.png](_img%2Fzad4_2_no_index.png)
+>```sql
+>CREATE NONCLUSTERED INDEX IX_StockItems_StockItemName ON Warehouse.StockItems(StockItemName);
+>```
+>![zad4_2_index.png](_img2%zad4_2_index.png)
+
+>3. Indeksy wykorzystujące kilka atrybutów, indeksy include
+>
+>Zakładając indeks na datę, supplierID możemy zoptymalizować poniższe zapytanie. Dodatkowo includując >TransactionAmount posiadamy wszystkie interesujące nas pola w indeksie i nie musimy robić lookupu. 
+>```sql
+>SELECT SupplierID, TransactionDate, TransactionAmount
+>FROM Purchasing.SupplierTransactions
+>WHERE SupplierID = 4 AND TransactionDate BETWEEN '2013-01-01' AND '2013-01-31';
+>```
+>![zad4_composite_results.png](_img%2Fzad4_composite_results.png)
+>
+>![zad4_3_no_index.png](_img%2Fzad4_3_no_index.png)
+>```sql
+>CREATE NONCLUSTERED INDEX IX_SupplierTransactions_Date_SupplierID_IncludeAmount 
+>ON Purchasing.SupplierTransactions(TransactionDate, SupplierID)
+>INCLUDE (TransactionAmount);
+>```
+>![zad4_3_index.png](_img%2Fzad4_3_index.png)
+
+
+>4. Filtered Index
+>
+>Jeśli transakcji w systemie pojawia się bardzo dużo, kosztownym może być utrzymywanie indeksu. Możemy >ograniczyć indeks do transakcji o dużych wartościach - te powinny nas bardziej interesować.
+>```sql
+>SELECT CustomerTransactionID, CustomerID, TransactionDate, TransactionAmount
+>FROM Sales.CustomerTransactions
+>WHERE TransactionAmount > 10000;
+>```
+>![zad4_filtered_results.png](_img%2Fzad4_filtered_results.png)
+>
+>![zad4_filtered_no_inex.png](_img%2Fzad4_filtered_no_inex.png)
+>```sql
+>CREATE NONCLUSTERED INDEX IX_CustomerTransactions_HighValue
+>ON Sales.CustomerTransactions (CustomerTransactionID)
+>INCLUDE (CustomerID, TransactionDate, TransactionAmount)
+>WHERE TransactionAmount > 15000; 
+>```
+>![zad4_filtered.png](_img%2Fzad4_filtered.png)
+
+>5. Kolumnowe indeks
+>
+>Zapytanie jak to potrzebne jest do obliczenia agregatów jak przychody czy coś. Kolumnowy indeks pomaga w tym.
+>```sql
+>SELECT OrderID, SUM(Quantity * UnitPrice) AS TotalAmount
+>FROM Sales.OrderLines
+>GROUP BY OrderID
+>HAVING SUM(Quantity * UnitPrice) > 10000;
+>```
+>![zad4_5_result.png](_img%2Fzad4_5_result.png)
+>
+>![zad4_5_really_no_index.png](_img%2Fzad4_5_really_no_index.png)
+>
+>```sql
+>CREATE NONCLUSTERED COLUMNSTORE INDEX IX_OrderLines_ColumnStore ON Sales.OrderLines
+>(OrderLineID, OrderID, Quantity, UnitPrice);
+>```
+>![zad4_5_column_index.png](_img%2Fzad4_5_column_index.png)
 
 
 |         |     |     |     |

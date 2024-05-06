@@ -251,3 +251,90 @@ przemek@przemek-laptop:/usr/lib/postgresql/12/bin$ ./pg_ctl -D /home/przemek/rep
 waiting for server to promote.... done
 server promoted
 ```
+
+
+### Zadanie dodatkowe - multi-standby setup
+
+Tworzę dwa dodatkowe backupy:
+```
+./pg_basebackup -h 127.0.0.1 -U repuser -p 5440 -D ~/replica_db2 -R -C -S slot_name2 -c fast
+
+./pg_basebackup -h 127.0.0.1 -U repuser -p 5440 -D ~/replica_db3 -R -C -S slot_name3 -c fast
+```
+
+Zmieniam port w plikach `postgresql.conf` na 5442 i 5443.
+Następnie startuje:
+```
+./pg_ctl -D /home/przemek/replica_db2 -l ~/replica_db2/logfile start
+./pg_ctl -D /home/przemek/replica_db3 -l ~/replica_db3/logfile start
+```
+
+Tworzę nową tabelę w primary:
+```
+postgres=# create table test_tbl2 (id int primary key, cost int);
+CREATE TABLE
+
+postgres=# insert into test_tbl2 (id, cost) values (1, 10);
+INSERT 0 1
+postgres=# insert into test_tbl2 (id, cost) values (2, 200);
+INSERT 0 1
+postgres=# insert into test_tbl2 (id, cost) values (3, 25);
+INSERT 0 1
+```
+
+Otwieram postgresa w replica_db3:
+```
+psql -p 5443 -U przemek -d postgres
+```
+
+Sprawdzam czy replika się udała:
+```
+postgres=# select * from test_tbl2;
+ id | cost 
+----+------
+  1 |   10
+  2 |  200
+  3 |   25
+(3 rows)
+```
+
+Dane zostały zbackupowane!
+
+### Zadanie dodatkowe - cascade setup
+
+Tworzymy replikę (UWAGA - jako primary podajemy port 5441, czyli naszą pierwszą replikę), zmieniamy port na 5444 i uruchamiamy:
+
+```
+./pg_basebackup -h 127.0.0.1 -U repuser -p 5441 -D ~/replica_db4 -R -C -S slot_name4 -c fast
+./pg_ctl -D /home/przemek/replica_db4 -l ~/replica_db4/logfile start
+```
+
+
+Insertuje dodatkowe wiersze z primary:
+```
+postgres=# insert into test_tbl2 (id, cost) values (4, 50);
+INSERT 0 1
+postgres=# insert into test_tbl2 (id, cost) values (5, 1000);
+INSERT 0 1
+postgres=# insert into test_tbl2 (id, cost) values (6, 22000);
+INSERT 0 1
+```
+
+
+Wchodzimy na replikę:
+```
+psql -p 5444 -U przemek -d postgres
+```
+
+Widzimy wyniki po replikacji:
+```
+ostgres=# select * from test_tbl2;
+ id | cost  
+----+-------
+  1 |    10
+  2 |   200
+  3 |    25
+  4 |    50
+  5 |  1000
+  6 | 22000
+```

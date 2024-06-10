@@ -52,9 +52,12 @@ US_STATES
 
 > Wyniki, zrzut ekranu, komentarz
 
+
 ```sql
---  ...
+SELECT  sdo_util.to_wktgeometry(geom)
+       FROM us_states
 ```
+![w:700](_img/zad1-1.png)
 
 
 US_INTERSTATES
@@ -63,8 +66,10 @@ US_INTERSTATES
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT  sdo_util.to_wktgeometry(geom)
+       FROM us_interstates
 ```
+![w:700](_img/zad1-2.png)
 
 
 US_CITIES
@@ -73,8 +78,10 @@ US_CITIES
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT  sdo_util.to_wktgeometry(location)
+       FROM us_cities
 ```
+![w:700](_img/zad1-3.png)
 
 
 US_RIVERS
@@ -83,8 +90,10 @@ US_RIVERS
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT  sdo_util.to_wktgeometry(geom)
+       FROM us_rivers
 ```
+![w:700](_img/zad1-4.png)
 
 
 US_COUNTIES
@@ -93,8 +102,11 @@ US_COUNTIES
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT  sdo_util.to_wktgeometry(geom)
+       FROM us_countie
 ```
+![w:700](_img/zad1-5.png)
+
 
 
 US_PARKS
@@ -103,8 +115,10 @@ US_PARKS
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT  sdo_util.to_wktgeometry(geom)
+       FROM us_parks where id < 500
 ```
+![w:700](_img/zad1-6.png)
 
 
 # Zadanie 2
@@ -205,22 +219,12 @@ WHERE id IN
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT sdo_util.to_wktgeometry(p.geom)
+FROM us_parks p, us_states s
+WHERE s.state = 'Wyoming'
+AND SDO_INSIDE (p.geom, s.geom ) = 'TRUE'
 ```
-
-
-```sql
-SELECT state, geom FROM us_states
-WHERE state = 'Wyoming'
-```
-
-
-
-> Wyniki, zrzut ekranu, komentarz
-
-```sql
---  ...
-```
+![w:700](_img/zad3-1.png)
 
 
 Porównaj wynik z:
@@ -232,15 +236,11 @@ WHERE s.state = 'Wyoming'
 AND SDO_ANYINTERACT (p.geom, s.geom ) = 'TRUE';
 ```
 
-W celu wizualizacji użyj podzapytania
+![w:700](_img/zad3-2.png)
 
 
-
-> Wyniki, zrzut ekranu, komentarz
-
-```sql
---  ...
-```
+### Wnioski
+SDO_ANYINTERACT zwróci także parki, które nie są całkowicie wewnątrz innego obszaru, ale także takie które się z nim przecinają
 
 
 # Zadanie 4
@@ -299,13 +299,26 @@ AND sdo_within_distance (c.location, i.geom,'distance=50 unit=mile'
 ```
 
 
-
 > Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+SELECT sdo_util.to_wktgeometry(geom)
+FROM us_interstates
+WHERE interstate = 'I4'
+
+
+SELECT sdo_util.to_wktgeometry(c.location)
+FROM us_cities c
+WHERE ROWID IN 
+( 
+    SELECT c.rowid
+    FROM us_interstates i, us_cities c 
+    WHERE i.interstate = 'I4'
+    AND sdo_within_distance(c.location, i.geom,'distance=50 unit=mile') = 'TRUE'
+)
 ```
 
+![w:700](_img/zad5-1.png)
 
 Dodatkowo:
 
@@ -325,9 +338,72 @@ f)      Itp. (własne przykłady)
 > Wyniki, zrzut ekranu, komentarz
 > (dla każdego z podpunktów)
 
+### a)
 ```sql
---  ...
+SELECT sdo_util.to_wktgeometry(a.geom)
+FROM us_counties a, us_interstates i
+WHERE i.interstate = 'I4'
+AND sdo_anyinteract(a.geom, i.geom) = 'TRUE'
 ```
+![w:700](_img/zad5-2.png)
+
+
+### b)
+```sql
+SELECT sdo_util.to_wktgeometry(a.geom)
+FROM us_counties a, us_interstates i
+WHERE i.interstate = 'I4' AND
+sdo_within_distance(a.geom, i.geom, 'distance=20 unit=mile') = 'TRUE'
+```
+![w:700](_img/zad5-3.png)
+
+### c)
+```sql
+SELECT sdo_util.to_wktgeometry(a.geom)
+FROM us_counties a, us_interstates i
+WHERE i.interstate = 'I4' AND
+sdo_within_distance(a.geom, i.geom, 'distance=20 unit=mile') = 'TRUE'
+```
+![w:700](_img/zad5-4.png)
+
+
+### d)
+```sql
+SELECT sdo_util.to_wktgeometry(i.geom)
+FROM us_interstates i, us_rivers r
+WHERE r.name = 'Mississippi'
+AND sdo_anyinteract(i.geom, r.geom) = 'TRUE'
+```
+![w:700](_img/zad5-5.png)
+
+
+### e)
+```
+SELECT sdo_util.to_wktgeometry(c.location)
+FROM us_cities c
+WHERE ROWID IN 
+( 
+   SELECT c.rowid
+   FROM us_interstates i, us_cities c 
+   WHERE i.interstate = 'I275'
+   AND sdo_within_distance(c.location, i.geom, 'distance=30 unit=mile') = 'TRUE'
+   AND sdo_within_distance(c.location, i.geom, 'distance=15 unit=mile') != 'TRUE'
+)
+```
+![w:700](_img/zad5-6.png)
+![w:700](_img/zad5-7.png)
+
+### f)
+np. Znajdź wszystkie miasta, które są w odległości do 10 mil od jakiejkolwiek rzeki
+
+```sql
+SELECT sdo_util.to_wktgeometry(a.geom)
+FROM us_counties a, us_interstates i
+WHERE i.interstate = 'I4' AND
+sdo_within_distance(a.geom, i.geom, 'distance=20 unit=mile') = 'TRUE'
+```
+![w:700](_img/zad5-8.png)
+
 
 # Zadanie 6
 
@@ -384,7 +460,7 @@ WHERE interstate = 'I4';
 >Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+[(212.260756199927,)]
 ```
 
 
@@ -404,8 +480,71 @@ e)    Itp. (własne przykłady)
 > Wyniki, zrzut ekranu, komentarz
 > (dla każdego z podpunktów)
 
+### a)
 ```sql
---  ...
+SELECT sdo_geom.sdo_length(r.geom, 0.05) AS length
+FROM us_rivers r
+WHERE r.name = 'Mississippi'
+
+[(3860325.66492228,)]
+```
+
+### b)
+```sql
+SELECT i.interstate, sdo_geom.sdo_length(i.geom, 0.05) AS length
+FROM us_interstates i
+ORDER BY length DESC
+FETCH FIRST 1 ROWS ONLY
+
+[('I90', 4290646.2617249)]
+
+SELECT i.interstate, sdo_geom.sdo_length(i.geom, 0.05) AS length
+FROM us_interstates i
+ORDER BY length ASC
+FETCH FIRST 1 ROWS ONLY
+
+[('I564', 462.140186764249)]
+```
+
+### c)
+```sql
+SELECT r.name, sdo_geom.sdo_length(r.geom, 0.05) AS length
+FROM us_rivers r
+ORDER BY length DESC
+
+Tutaj wystąpił problem, nie dość, że wyniki są złe, to St. Clair absolutnie nie jest tak długa. Wynika to zapewne z problemów z funkcją liczącą długość
+[('St. Clair', 6950919.37515048), ('Missouri', 4955061.82235441), ('Mississippi', 3860325.66492228), ('Rio Grande', 2397134.4137634), ('Colorado', 2371322.05751783), ('Arkansas', 1960668.35952183), ('Yukon', 1926596.7565586)]
+
+
+SELECT r.name, sdo_geom.sdo_length(r.geom, 0.05) AS length
+FROM us_rivers r
+ORDER BY length ASC
+FETCH FIRST 1 ROWS ONLY
+
+[('Richelieu', 1161.69766454518)]
+```
+
+
+### d)
+```sql
+SELECT state, sdo_geom.sdo_length(geom, 0.05) AS boundary_length
+FROM us_states 
+ORDER BY boundary_length DESC
+FETCH FIRST 1 ROWS ONLY
+
+[('Alaska', 26138374.5019651)]
+```
+
+### e)
+Znajdz park narodowy o największej powierchni
+
+```sql
+SELECT p.name, SDO_GEOM.SDO_AREA(p.geom, 0.05) AS area
+FROM us_parks p
+ORDER BY area DESC
+FETCH FIRST 1 ROWS ONLY
+
+[('Wrangell-St. Elias NP and NPRE', 53370014289.0794)]
 ```
 
 Oblicz odległość między miastami Buffalo i Syracuse
@@ -416,12 +555,10 @@ FROM us_cities c1, us_cities c2
 WHERE c1.city = 'Buffalo' and c2.city = 'Syracuse';
 ```
 
-
-
 >Wyniki, zrzut ekranu, komentarz
 
 ```sql
---  ...
+[(222184.610363969,)]
 ```
 
 Dodatkowo:
@@ -448,12 +585,64 @@ f)      Itp. (własne przykłady)
 > Wyniki, zrzut ekranu, komentarz
 > (dla każdego z podpunktów)
 
+### a)
 ```sql
---  ...
+SELECT SDO_GEOM.SDO_DISTANCE(c.location, i.geom, 0.05) AS distance
+FROM us_cities c, us_interstates i
+WHERE c.city = 'Tampa' AND i.interstate = 'I4'
+
+[(3103.91172130556,)]
+```
+
+### b)
+```sql
+SELECT SDO_GEOM.SDO_DISTANCE(ny.geom, fl.geom, 0.05) AS distance
+FROM us_states ny, us_states fl
+WHERE ny.state = 'New York' AND fl.state = 'Florida'
+
+[(1256583.87785727,)]
+```
+
+### c)
+```sql
+SELECT SDO_GEOM.SDO_DISTANCE(nyc.location, fl.geom, 0.05) AS distance
+FROM us_cities nyc, us_states fl
+WHERE nyc.city = 'New York' AND fl.state = 'Florida'
+
+[(1296590.76150732,)]
+```
+
+### d)
+```sql
+SELECT p.name, SDO_GEOM.SDO_DISTANCE(nyc.location, p.geom, 0.05) AS distance
+FROM us_cities nyc, us_parks p
+WHERE nyc.city = 'New York'
+ORDER BY distance ASC
+FETCH FIRST 3 ROWS ONLY
+
+[('Institute Park', 1539.89392335604), ('Prospect Park', 1718.06926034585), ('Thompkins Park', 2135.55672310316)]
+
+```
+
+### e)
+
+Nie trzeba testować, jest dokumentacja
+
+### f)
+np. Znajdź wszystkie miasta, które leżą w pobliżu dwóch różnych autostrad
+```sql
+SELECT c.city
+FROM us_cities c, us_interstates i1, us_interstates i2
+WHERE i1.interstate = 'I5' AND i2.interstate = 'I10'
+AND SDO_WITHIN_DISTANCE(c.location, i1.geom, 'distance=10 unit=mile') = 'TRUE'
+AND SDO_WITHIN_DISTANCE(c.location, i2.geom, 'distance=10 unit=mile') = 'TRUE'
+
+[('Inglewood',), ('El Monte',), ('Los Angeles',), ('Glendale',), ('Pasadena',)]
+
 ```
 
 
-Zadanie 8
+# Zadanie 8
 
 Wykonaj kilka własnych przykładów/analiz
 

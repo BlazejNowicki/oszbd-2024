@@ -626,7 +626,7 @@ FETCH FIRST 3 ROWS ONLY
 
 ### e)
 
-Nie trzeba testować, jest dokumentacja
+Nie trzeba testować, jest dokumentacja, więc można przeczytać.
 
 ### f)
 np. Znajdź wszystkie miasta, które leżą w pobliżu dwóch różnych autostrad
